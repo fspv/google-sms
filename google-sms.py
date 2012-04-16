@@ -9,8 +9,9 @@ import getopt
 import sys
 import time
 version = "0.01"
-config = {  'email':'example@email.com',
-            'password':'password',
+config = {  'email':'mail@example.com',
+            'password':'passwd',
+            'calendar':'default',
             'title':'Title of your event here',
             'location':'Location of your event here'
 }
@@ -21,13 +22,16 @@ def usage():
     -p  --password=PASSWORD     set password for your Google account\n\r\
     -t  --title=TITLE           set title of event\n\r\
     -l  --location=LOCATION     set location of event\n\r\
+    -c  --calendar=CALENDAR     set calendar name (default if not specifyed\n\r\
     -h  --help                  display this help and exit\n\r\
     -v  --version               display script version and exit")
 class SMS():
-    def __init__(self,email,password,title,location):
+    def __init__(self,email,password,title,location,calendar):
         """Connect to Google Calendar"""
         self.title = title
         self.location = location
+        self.calendar_title = calendar
+        self.calendar_link = "http://www.google.com/calendar/feeds/default/private/full"
         self.calendar_service = gdata.calendar.service.CalendarService()
         self.calendar_service.email = email
         self.calendar_service.password = password
@@ -35,13 +39,16 @@ class SMS():
             self.calendar_service.ProgrammaticLogin()
         except gdata.service.BadAuthentication as BadAuth:
             print(BadAuth)
-            raise
+            sys.exit(2)
         except gdata.service.CaptchaRequired as Captcha:
             print(Captcha)
-            raise
+            sys.exit(2)
         except:
             raise
         self.feed = self.calendar_service.GetOwnCalendarsFeed()
+        for a_calendar in self.feed.entry:
+            if self.calendar_title == a_calendar.title.text:
+                self.calendar_link = a_calendar.link[0].href
     def send(self):
         """Add new event and set SMS-reminder"""
         event = gdata.calendar.CalendarEventEntry()
@@ -61,7 +68,7 @@ class SMS():
             else:
                 a_when.reminder.append(gdata.calendar.Reminder(minutes=minutes))
         # Insert new event
-        new_event = self.calendar_service.InsertEvent(event, '/calendar/feeds/default/private/full')
+        new_event = self.calendar_service.InsertEvent(event, self.calendar_link)
         return new_event
 def usage():
     """Prints right usage for this script"""
@@ -70,12 +77,13 @@ def usage():
     -p  --password=PASSWORD     set password for your Google account\n\r\
     -t  --title=TITLE           set title of event\n\r\
     -l  --location=LOCATION     set location of event\n\r\
+    -c  --calendar=CALENDAR     set calendar name to which you want to add event\n\r\
     -h  --help                  display this help and exit\n\r\
     -v  --version               display script version and exit")
 def main():
     """Check args, setting values and try to send SMS"""
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hve:p:t:l:", ["help", "email=", "password=", "title=","location="])
+        opts, args = getopt.getopt(sys.argv[1:], "hve:p:t:l:c:", ["help", "email=", "password=", "title=","location=","calendar="])
     except getopt.GetoptError as err:
         """ print help information and exit """
         print(err)
@@ -85,6 +93,7 @@ def main():
     password = config['password']
     title = config['title']
     location = config['location']
+    calendar = config['calendar']
     for o,a in opts:
         if o == "-v":
             print("Python script for sending free SMS via Google Calendar v"+version)
@@ -100,8 +109,10 @@ def main():
             title = a
         elif o in ("-l","--location"):
             location = a
+        elif o in ("-c","--calendar"):
+            calendar = a
     try:
-        sms = SMS(email,password,title,location)
+        sms = SMS(email,password,title,location,calendar)
     except:
         raise
     else:

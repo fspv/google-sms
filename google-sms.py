@@ -32,6 +32,7 @@ def usage():
 
 
 class SMS():
+
     def __init__(self, email, password, title, location, calendar):
         """Connect to Google Calendar"""
         self.title = title
